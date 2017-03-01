@@ -1,0 +1,6 @@
+---
+
+files:
+  build: .
+  labels:
+    - "traefik.frontend.rule=Host:acme-bootstrap.cc.dockerland.org"

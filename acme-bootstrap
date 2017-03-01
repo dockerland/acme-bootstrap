@@ -28,7 +28,7 @@ main(){
   install/dex "0.12.x" "$BIN_PATH/dex"
 
   # install or update tooling (tools are prefixed as $BOOTSTRAP_ORG- )
-  install/tools "acme" "git@github.com:dockerland/charleston-containers.git"
+  install/tools "acme" "git@github.com:dockerland/acme-bootstrap.git"
 
   # add BIN_PATH to user's PATH
   ammend/path "$BIN_PATH"
@@ -88,3 +88,8 @@ ammend/path(){
 
 
 main "$@"
+
+#
+# your probably want to execute this file in bash, e.g.
+#   curl http://.../ | bash
+#
