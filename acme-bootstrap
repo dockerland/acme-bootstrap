@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+
+main(){
+  set -eo pipefail
+
+  BOOTSTRAP_ORG=${BOOTSTRAP_ORG:-acme}
+  BOOTSTRAP_PATH=${BOOTSTRAP_PATH:-~/$BOOTSTRAP_ORG}
+
+  local BIN_PATH="$BOOTSTRAP_PATH/bin"
+
+  # source shell-helpers (https://github.com/briceburg/shell-helpers)
+  # for performance and security,
+  #    the contents of this script should be inlined instead of fetched
+  echo "pulling shell-helpers..." >&2
+  source /dev/stdin <<< "$(curl -L http://get.iceburg.net/shell-helpers/latest-v2/shell-helpers.sh)";
+
+  p/log "welcome to the \e[1m$BOOTSTRAP_ORG\e[21m bootstrap"
+
+  # santity
+  is/cmd git || die "ensure git is installed and in your path"
+  is/cmd docker || die "ensure docker is installed and in your path"
+
+  # ensure BIN_PATH and BOOTSTRAP_PATH exist
+  p/notice "ensuring BIN_PATH - $BIN_PATH"
+  mkdir -p "$BIN_PATH"
+
+  # install latest dex
+  install/dex "0.12.x" "$BIN_PATH/dex"
+
+  # install or update tooling (tools are prefixed as $BOOTSTRAP_ORG- )
+  install/tools "acme" "git@github.com:dockerland/charleston-containers.git"
+
+  # add BIN_PATH to user's PATH
+  ammend/path "$BIN_PATH"
+
+  p/success "all up to date!"
+}
+
+install/dex(){
+  local version="$1"
+  local dest="$2"
+  local url="http://get.iceburg.net/dex/latest-$version/dex"
+
+  p/notice "install dex v$version"
+  __force=true network/fetch "$url" "$dest"
+  chmod +x "$dest"
+}
+
+install/tools(){
+  local repo="$1"
+  local url="$2"
+  local dex="$BIN_PATH/dex"
+  (
+    export DEX_BIN_DIR="$BIN_PATH"
+    export DEX_BIN_PREFIX="$BOOTSTRAP_ORG-"
+
+    # ensure the "acme" tooling repository
+    $dex repo ls $repo | grep -q $repo || {
+      $dex repo add --force acme "$url"
+    }
+
+    # we use --force --pull to automatically update tools...
+    $dex install --force --pull $repo/
+  )
+}
+
+ammend/path(){
+  local path="$1"
+
+  shell/detect || true
+
+  # add path to PATH in user's environment file
+  if grep -q "$path" "$__shell_file"; then
+    p/log "skipping $__shell_file amendment, $path is in PATH."
+  else
+    p/log "amending $__shell_file, adding $path to PATH..."
+    shell/evaluable_export PATH "$path" true 2>/dev/null | while read line; do
+      echo "$line"  >> "$__shell_file"
+    done
+  fi
+
+  # warn if path is not in active PATH
+  [[ "$PATH" == *"$path"* ]] || {
+    p/shout "WARNING - $path has been added to your PATH but is not active for this session" \
+      "please source $__shell_file or restart your shell "
+  }
+}
+
+
+main "$@"
